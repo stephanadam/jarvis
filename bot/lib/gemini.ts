@@ -27,7 +27,7 @@ export type GeminiGenerateResult = {
 };
 
 /** Default Flash model for low-latency home-assistant style replies. */
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 
 export async function generateContent(args: {
   apiKey: string;

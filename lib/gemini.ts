@@ -17,7 +17,7 @@ export function resolveGeminiKey(
 }
 
 /** Default Flash model for low-latency home-assistant style replies. */
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 
 export type GeminiPart =
   | { text: string }

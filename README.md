@@ -75,7 +75,7 @@ No Cursor Team / `agent-sdk deploy --team` required.
 
 | Path | What runs |
 | --- | --- |
-| **HTTP brain (this app)** | Gemini (default `gemini-2.5-flash`) via Google AI Studio |
+| **HTTP brain (this app)** | Gemini (default `gemini-3.8-flash`) via Google AI Studio |
 | **Legacy Agent SDK** | Would use Cursor model `grok-4.7` — not the deploy path |
 
 ## Notes
