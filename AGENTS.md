@@ -1,40 +1,40 @@
 # jarvis
 
-Agent SDK project (`@grok/agent-sdk`). This file is
-for coding agents editing the project. The served agent's prompt is
-`bot/instructions.md`.
+HTTP cloud brain for Steve's home assistant (Next.js + Gemini + Home Assistant).
+Deploy with Cursor **publish-app**, not Agent SDK managed hosting.
 
-## Loop
+Legacy Agent SDK scaffold lives under `bot/` (unused for deploy). Its prompt is
+`bot/instructions.md` if you revive that path.
+
+## Loop (HTTP app)
 
 ```bash
-agent-sdk validate --dir .
-agent-sdk info --dir . --json
-agent-sdk run --dir . --message "..."
-agent-sdk eval --dir .
+npm install
 npm run check
+npm run dev
+# GET  /api/health
+# POST /api/chat  {"message":"..."}
+npm run build && npm start
 ```
 
-Run the CLI under Node, never Bun.
+Run under Node, never Bun.
 
 ## Layout
 
-- `bot/instructions.md` is the always-on prompt. Keep it short.
-- `bot/tools/<name>.ts` is one tool per file. The filename is the tool name.
-- `bot/lib/` is shared code. Never discovered.
-- `evals/` is filesystem evals (`evals/evals.config.ts` required).
-  Not `bot/evals/`. That path is ignored.
+- `app/` — Next.js UI + API routes (`api/health`, `api/chat`)
+- `lib/` — Gemini, HA REST, capability registry, chat tool loop
+- `bot/` — unused Agent SDK scaffold (tools, instructions)
+- `evals/` — legacy Agent SDK evals
 
 ## Do not
 
-- Grow host TypeScript for formatting, classification, or reply composition.
-  That stays in instructions/skills. Host code owns auth, idempotency,
-  evidence seeding, and side-effect gates.
-- Add npm deps on a first cut. Stick to what `@grok/agent-sdk` already ships.
-- Point `serve` at a parent folder during bring-up. It mounts every sibling.
+- Require `CURSOR_API_KEY` or `agent-sdk deploy` for the runnable product.
+- Paste secret values into chat; document **names** only.
+- Grow host TypeScript for reply composition beyond the thin chat/tool loop —
+  persona stays in `lib/chat.ts` system prompt (and `bot/instructions.md` for SDK).
+- Add npm deps casually; stick to Next + React unless needed.
 
-## Pointers
+## Secrets (names)
 
-- Package loop: `node_modules/@grok/agent-sdk/AGENTS.md`
-- Skills: `node_modules/@grok/agent-sdk/skills/` (`create-agent`, `deploy`, `evals`, `hillclimb`, `debug`)
-- Docs: `npx @grok/agent-sdk docs`
-- LLM docs index: `node_modules/@grok/agent-sdk/dist/docs/llms.txt`
+`JARVIS_API_KEY` (required on `/api/chat`), `GEMINI_API_KEY` / `GOOGLE_API_KEY`,
+`NABU_CASA_URL` / `HA_URL`, `HA_TOKEN`

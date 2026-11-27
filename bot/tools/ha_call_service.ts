@@ -1,10 +1,13 @@
 import { defineTool } from "@grok/agent-sdk/tools";
-import { haFetch, resolveHaConfig } from "../lib/ha.js";
 import * as z from "zod/v4";
 
+/**
+ * Legacy Agent SDK write tool — refuses all HA writes (same policy as HTTP brain).
+ * Do not call Nabu Casa from this path until a strict allowlist is enabled.
+ */
 export default defineTool({
   description:
-    "Call a Home Assistant service (e.g. light.turn_on) via Nabu Casa REST.",
+    "Call a Home Assistant service. Currently disabled (HA writes on hold).",
   effect: "write",
   inputSchema: z.object({
     domain: z.string().describe("Service domain, e.g. light, switch, scene"),
@@ -16,37 +19,16 @@ export default defineTool({
     data: z
       .record(z.string(), z.unknown())
       .optional()
-      .describe("Extra service data fields"),
+      .describe("Extra service data fields (ignored while writes are disabled)"),
   }),
-  async execute({ domain, service, entity_id, data }) {
-    const cfg = resolveHaConfig();
-    if (!cfg.ok) {
-      return {
-        ok: false,
-        error: "missing_secrets",
-        missing: cfg.missing,
-        hint: "Bind NABU_CASA_URL (or HA_URL) and HA_TOKEN as deployment secrets.",
-      };
-    }
-    const payload: Record<string, unknown> = { ...(data ?? {}) };
-    if (entity_id) payload.entity_id = entity_id;
-
-    const { status, body } = await haFetch(
-      `/api/services/${encodeURIComponent(domain)}/${encodeURIComponent(service)}`,
-      {
-        method: "POST",
-        baseUrl: cfg.baseUrl,
-        token: cfg.token,
-        body: JSON.stringify(payload),
-      },
-    );
+  async execute({ domain, service, entity_id }) {
     return {
-      ok: status >= 200 && status < 300,
-      status,
+      ok: false,
+      error: "ha_writes_disabled",
       domain,
       service,
       entity_id: entity_id ?? null,
-      body,
+      hint: "Home Assistant writes are disabled until a strict allowlist ships.",
     };
   },
 });

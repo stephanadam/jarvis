@@ -27,7 +27,7 @@ export type GeminiGenerateResult = {
 };
 
 /** Default Flash model for low-latency home-assistant style replies. */
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 
 export async function generateContent(args: {
   apiKey: string;
@@ -35,10 +35,14 @@ export async function generateContent(args: {
   prompt: string;
 }): Promise<GeminiGenerateResult> {
   const model = args.model?.trim() || DEFAULT_GEMINI_MODEL;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(args.apiKey)}`;
+  // Pass the API key in a header — never in the URL query string.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": args.apiKey,
+    },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: args.prompt }] }],
     }),

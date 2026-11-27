@@ -1,86 +1,87 @@
 # Jarvis
 
-Steve's home-assistant brain: **Cursor Agent SDK** hosting, Home Assistant via
-Nabu Casa, capability/plugin registry for future vision plugins.
+Steve's home-assistant **HTTP cloud brain**: Gemini + Home Assistant (Nabu Casa),
+deployable with Cursor **publish-app**. Designed for a future iPhone voice client
+(`POST /api/chat` text in/out).
 
-## Models (honest split)
+Agent SDK files under `bot/` remain in-repo as an unused scaffold. Deploy does
+**not** use `agent-sdk deploy` or `CURSOR_API_KEY`.
 
-| Path | What runs | How |
-| --- | --- | --- |
-| **Hosted agent turns** | Cursor model `grok-4.7` (Agent SDK default; no Gemini model id in Agent SDK) | `bot/agent.ts` → Cursor-managed hosting |
-| **Gemini API** | Google AI Studio models (default `gemini-2.5-flash`) | Server tool `gemini_generate` using `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
-
-Jarvis is **not** hosted as a Gemini model inside Agent SDK. Steve's Google AI
-Studio key drives Gemini through the tool/API wrapper above.
-
-## Channels
-
-Playground + HTTP (always on with Agent SDK). No Slack/Teams yet.
-
-## Secrets (names only — never paste values in chat)
-
-Bind these in Cursor deployment secrets / local `.env` (see `.env.example`):
-
-| Name | Purpose |
-| --- | --- |
-| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Google AI Studio key for `gemini_generate` |
-| `NABU_CASA_URL` or `HA_URL` | Remote HA base URL (no trailing slash) |
-| `HA_TOKEN` | Home Assistant long-lived access token |
-
-After deploy:
-
-```bash
-npx --yes "@grok/agent-sdk@0.7.2" secret set jarvis GEMINI_API_KEY
-npx --yes "@grok/agent-sdk@0.7.2" secret set jarvis NABU_CASA_URL
-npx --yes "@grok/agent-sdk@0.7.2" secret set jarvis HA_TOKEN
-npx --yes "@grok/agent-sdk@0.7.2" secret list jarvis
-```
-
-Also add Steve's Nabu Casa hostname to `hosting.egressDomains` in
-`bot/agent.ts` (e.g. `xxxxx.ui.nabu.casa`) before relying on HA from hosting.
-
-## Layout
-
-- `bot/agent.ts` — model + hosting secrets/egress
-- `bot/instructions.md` — Jarvis persona
-- `bot/tools/` — `list_capabilities`, `ha_get_state`, `ha_call_service`, `gemini_generate`
-- `bot/lib/` — capability registry, HA + Gemini helpers
-- `bot/mcp-connections/home-assistant.ts` — optional remote MCP stub
-- `bot/skills/home-control/` — HA procedure
-- `evals/smoke.eval.ts` — capability registry smoke
-
-## Test locally
+## Run locally
 
 ```bash
 cd jarvis
-npx --yes "@grok/agent-sdk@0.7.2" validate --dir .
-npx tsc --noEmit -p .
-npx --yes "@grok/agent-sdk@0.7.2" tool call list_capabilities --dir . --input '{}'
-npx --yes "@grok/agent-sdk@0.7.2" run --dir . --message "List your capabilities."
-npx --yes "@grok/agent-sdk@0.7.2" dev
-# http://127.0.0.1:3000/playground
-npx --yes "@grok/agent-sdk@0.7.2" eval --dir . --tag smoke
+cp .env.example .env.local   # fill secret names if you have values locally
+npm install
+npm run dev
+# http://127.0.0.1:3000
 ```
 
-Model turns need a Cursor credential (`CURSOR_API_KEY` or `agent-sdk login`).
+Smoke (requires `JARVIS_API_KEY` in `.env.local`):
 
-## Deploy (do not run until Steve is ready)
+```bash
+curl -s http://127.0.0.1:3000/api/health | jq .
+curl -s http://127.0.0.1:3000/api/health \
+  -H "Authorization: Bearer $JARVIS_API_KEY" | jq .
+curl -s -X POST http://127.0.0.1:3000/api/chat \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $JARVIS_API_KEY" \
+  -d '{"message":"List your capabilities."}' | jq .
+```
 
-Follow `~/.cursor/skills-cursor/agent-sdk-deploy/SKILL.md`:
+Without Gemini keys, authenticated `/api/chat` returns a **sample-mode** reply.
+With Gemini + HA secrets bound, Gemini can call allowlisted HA tools.
 
-1. Push this repo to GitHub.
-2. `npx --yes "@grok/agent-sdk@0.7.2" validate --dir .`
-3. `npx --yes "@grok/agent-sdk@0.7.2" deploy --dir . --dry-run`
-4. Steve runs `npx --yes "@grok/agent-sdk@0.7.2" deploy --dir .` and saves the alias token.
-5. Bind secrets (names above), then
-   `npx --yes "@grok/agent-sdk@0.7.2" session create --slug jarvis --message "List capabilities" --wait`.
+```bash
+npm run check
+npm run build
+```
 
-Manage at https://cursor.com/dashboard/deployed-agents.
+## API
 
-## Notes / open items
+| Method | Path | Auth | Notes |
+| --- | --- | --- | --- |
+| `GET` | `/api/health` | optional | Without key: `{ ok, service }` only. With key: readiness details. |
+| `POST` | `/api/chat` | **required** | `Authorization: Bearer <JARVIS_API_KEY>` or `x-api-key` |
 
-- **MCP URL shape:** Agent SDK does not expand `${…}` in connection `url` (only
-  headers/env). REST tools read secrets per-call and are the reliable HA path
-  today. Confirm the real Nabu Casa / HA MCP path before relying on
-  `bot/mcp-connections/home-assistant.ts` (stub uses `{base}/api/mcp`).
-- **iOS voice app:** out of scope for this scaffold.
+Body: `{ "message": "…" }` or `{ "text": "…" }` → `{ ok, reply, text, model, … }`.
+
+## Secrets (names only — never paste values in chat)
+
+| Name | Purpose |
+| --- | --- |
+| **`JARVIS_API_KEY`** | Client API key for chat (and detailed health). Bind in Cursor secure form; use the same value in the web UI Settings field and later in **Safari Settings** for the iPhone app. |
+| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Google AI Studio key for the brain |
+| `NABU_CASA_URL` or `HA_URL` | Remote HA base URL (no trailing slash) |
+| `HA_TOKEN` | Home Assistant long-lived access token |
+
+Bind via Cursor app secrets when publishing. Agents never need the raw values in conversation.
+
+## Layout
+
+| Path | Role |
+| --- | --- |
+| `app/` | Next.js UI + `api/health` + `api/chat` |
+| `lib/` | Auth, Gemini, HA REST + allowlist, capability registry, chat loop |
+| `bot/` | Legacy Agent SDK scaffold (not used for deploy) |
+| `evals/` | Legacy Agent SDK evals |
+
+## Publish (Steve)
+
+1. Confirm **Publish** when the agent proposes an update.
+2. Bind secrets in Cursor (secure form): **`JARVIS_API_KEY`**, `GEMINI_API_KEY`, and when ready `NABU_CASA_URL` / `HA_TOKEN`.
+3. Open the private app, paste `JARVIS_API_KEY` into Settings, smoke chat.
+4. iPhone: store the same `JARVIS_API_KEY` in Safari Settings when that app exists.
+
+## Models
+
+| Path | What runs |
+| --- | --- |
+| **HTTP brain (this app)** | Gemini (default `gemini-3.8-flash`) via Google AI Studio |
+| **Legacy Agent SDK** | Would use Cursor model `grok-4.7` — not the deploy path |
+
+## Notes
+
+- Capability registry includes live `home_assistant.*` and stub `vision.face_recognize`.
+- HA **writes are disabled** server-side (and in legacy `bot/` tools) until a strict allowlist ships; reads via `ha_get_state` remain.
+- Architecture: Project doc `docs/jarvis-architecture.md`.
