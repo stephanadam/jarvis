@@ -18,9 +18,8 @@ export const SYSTEM_PROMPT = `You are Jarvis, Steve's calm, capable home assista
 Prefer tools over guessing. Keep replies short and actionable unless asked for detail.
 
 Home control:
-- Read entity state with ha_get_state.
-- Change devices/scenes with ha_call_service (domain + service + entity_id).
-- Locks, alarms, and other high-risk domains are blocked server-side — do not claim they ran.
+- Read entity state with ha_get_state when HA secrets are bound.
+- Home Assistant writes (ha_call_service) are disabled server-side for now — say so; do not claim they ran.
 - List registered plugins with list_capabilities before inventing new ones.
 - If Home Assistant secrets are missing, say which secret names are needed
   (NABU_CASA_URL or HA_URL, and HA_TOKEN). Never invent URLs or tokens.
@@ -77,7 +76,7 @@ const TOOL_DECLARATIONS: GeminiFunctionDeclaration[] = [
   {
     name: "ha_call_service",
     description:
-      "Call a Home Assistant service (e.g. light.turn_on) via Nabu Casa REST.",
+      "Attempt a Home Assistant service call. Currently disabled server-side (HA writes on hold).",
     parameters: {
       type: "object",
       properties: {
@@ -91,11 +90,7 @@ const TOOL_DECLARATIONS: GeminiFunctionDeclaration[] = [
         },
         entity_id: {
           type: "string",
-          description: "Target entity_id when the service applies to one entity",
-        },
-        data: {
-          type: "object",
-          description: "Extra service data fields",
+          description: "Target entity_id (required when writes are enabled)",
         },
       },
       required: ["domain", "service"],
@@ -132,22 +127,21 @@ async function invokeTool(
     case "ha_call_service": {
       const domain = String(args.domain ?? "");
       const service = String(args.service ?? "");
-      if (!domain || !service) {
-        return { ok: false, error: "domain and service required" };
-      }
-      const allowed = assertHaServiceAllowed(domain, service);
+      const entityId =
+        typeof args.entity_id === "string" ? args.entity_id : undefined;
+      const allowed = assertHaServiceAllowed(domain, service, entityId);
       if (!allowed.ok) {
-        return { ok: false, error: allowed.error };
+        return {
+          ok: false,
+          error: allowed.error,
+          hint: "Home Assistant writes are disabled until a strict allowlist ships.",
+        };
       }
       return haCallService({
         domain,
         service,
-        entity_id:
-          typeof args.entity_id === "string" ? args.entity_id : undefined,
-        data:
-          args.data && typeof args.data === "object"
-            ? (args.data as Record<string, unknown>)
-            : undefined,
+        entity_id: allowed.entity_id,
+        data: allowed.data,
       });
     }
     case "vision_face_recognize":

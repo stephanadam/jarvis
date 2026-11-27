@@ -35,10 +35,14 @@ export async function generateContent(args: {
   prompt: string;
 }): Promise<GeminiGenerateResult> {
   const model = args.model?.trim() || DEFAULT_GEMINI_MODEL;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(args.apiKey)}`;
+  // Pass the API key in a header — never in the URL query string.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": args.apiKey,
+    },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: args.prompt }] }],
     }),

@@ -32,9 +32,10 @@ const CAPABILITIES: Capability[] = [
   {
     id: "home_assistant.call_service",
     version: "0.1.0",
-    description: "Call a Home Assistant service (turn on/off, scenes, etc.).",
+    description:
+      "Call a Home Assistant service (turn on/off, scenes, etc.). Writes disabled until a strict allowlist ships.",
     requiredSecrets: ["NABU_CASA_URL|HA_URL", "HA_TOKEN"],
-    status: "live",
+    status: "stub",
   },
   {
     id: "vision.face_recognize",

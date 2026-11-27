@@ -83,5 +83,5 @@ Bind via Cursor app secrets when publishing. Agents never need the raw values in
 ## Notes
 
 - Capability registry includes live `home_assistant.*` and stub `vision.face_recognize`.
-- HA writes are allowlisted server-side (no locks/alarms/unlocks).
+- HA **writes are disabled** server-side (and in legacy `bot/` tools) until a strict allowlist ships; reads via `ha_get_state` remain.
 - Architecture: Project doc `docs/jarvis-architecture.md`.

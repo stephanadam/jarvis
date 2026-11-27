@@ -1,4 +1,5 @@
-import { requireJarvisApiKey } from "@/lib/auth";
+import { createHash } from "node:crypto";
+import { extractClientApiKey, requireJarvisApiKey } from "@/lib/auth";
 import { runChat } from "@/lib/chat";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -11,10 +12,11 @@ type ChatBody = {
   text?: unknown;
 };
 
-function clientKey(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded?.split(",")[0]?.trim() || "unknown";
-  return `chat:${ip}`;
+/** Rate-limit by authenticated API key only — never trust X-Forwarded-For. */
+function rateLimitKey(request: Request): string {
+  const apiKey = extractClientApiKey(request) || "missing";
+  const hash = createHash("sha256").update(apiKey).digest("hex").slice(0, 24);
+  return `chat:key:${hash}`;
 }
 
 export async function POST(request: Request) {
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
   }
 
   const limited = rateLimit({
-    key: clientKey(request),
+    key: rateLimitKey(request),
     limit: 20,
     windowMs: 60_000,
   });
@@ -89,7 +91,6 @@ export async function POST(request: Request) {
       reply: result.reply,
       text: result.reply,
       model: result.model,
-      // Names only — never raw HA bodies
       toolsUsed: result.toolsUsed?.map((t) => ({ name: t.name })),
       error: result.error,
       missingSecrets: result.missingSecrets,
