@@ -27,9 +27,11 @@ export function extractClientApiKey(request: Request): string | null {
     const match = /^Bearer\s+(.+)$/i.exec(auth.trim());
     if (match?.[1]) return match[1].trim();
   }
+  // Accept common client headers (Safari voice UI uses X-Jarvis-Key).
   const xApi =
     request.headers.get("x-api-key") ||
-    request.headers.get("x-jarvis-api-key");
+    request.headers.get("x-jarvis-api-key") ||
+    request.headers.get("x-jarvis-key");
   if (xApi?.trim()) return xApi.trim();
   return null;
 }
@@ -58,7 +60,7 @@ export function requireJarvisApiKey(request: Request): Response | null {
       {
         ok: false,
         error: "unauthorized",
-        hint: "Send Authorization: Bearer <JARVIS_API_KEY> (or x-api-key).",
+        hint: "Send Authorization: Bearer <JARVIS_API_KEY> (or x-api-key / X-Jarvis-Key).",
       },
       { status: 401 },
     );
