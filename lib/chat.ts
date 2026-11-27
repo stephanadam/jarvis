@@ -207,67 +207,86 @@ export async function runChat(message: string): Promise<ChatResult> {
   ];
   const toolsUsed: ChatToolTrace[] = [];
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const result = await generateContent({
-      apiKey: key.apiKey,
-      model: DEFAULT_GEMINI_MODEL,
-      systemInstruction: SYSTEM_PROMPT,
-      contents,
-      tools: TOOL_DECLARATIONS,
-    });
-
-    if (!result.ok) {
-      return {
-        ok: false,
-        reply: "",
-        model: result.model,
-        error: result.error || "Gemini request failed",
-        toolsUsed,
-      };
-    }
-
-    const calls = result.functionCalls ?? [];
-    if (calls.length === 0) {
-      return {
-        ok: true,
-        reply: result.text || "(empty reply)",
-        model: result.model,
-        toolsUsed,
-      };
-    }
-
-    const modelParts: GeminiPart[] =
-      result.parts && result.parts.length > 0
-        ? result.parts
-        : calls.map((c) => ({
-            functionCall: { name: c.name, args: c.args },
-          }));
-    contents.push({ role: "model", parts: modelParts });
-
-    const responseParts: GeminiPart[] = [];
-    for (const call of calls) {
-      const toolResult = await invokeTool(call.name, call.args);
-      const safeForModel = truncateForModel(toolResult);
-      toolsUsed.push({
-        name: call.name,
-        args: call.args,
-        result: { ok: Boolean(toolResult.ok), error: toolResult.error },
+  try {
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const result = await generateContent({
+        apiKey: key.apiKey,
+        model: DEFAULT_GEMINI_MODEL,
+        systemInstruction: SYSTEM_PROMPT,
+        contents,
+        tools: TOOL_DECLARATIONS,
       });
-      responseParts.push({
-        functionResponse: {
+
+      if (!result.ok) {
+        return {
+          ok: false,
+          reply: "",
+          model: result.model,
+          error: result.error || "Gemini request failed",
+          toolsUsed,
+        };
+      }
+
+      const calls = result.functionCalls ?? [];
+      if (calls.length === 0) {
+        return {
+          ok: true,
+          reply: result.text || "(empty reply)",
+          model: result.model,
+          toolsUsed,
+        };
+      }
+
+      const modelParts: GeminiPart[] =
+        result.parts && result.parts.length > 0
+          ? result.parts
+          : calls.map((c) => ({
+              functionCall: { name: c.name, args: c.args },
+            }));
+      contents.push({ role: "model", parts: modelParts });
+
+      const responseParts: GeminiPart[] = [];
+      for (const call of calls) {
+        let toolResult: Record<string, unknown>;
+        try {
+          toolResult = await invokeTool(call.name, call.args);
+        } catch (err) {
+          toolResult = {
+            ok: false,
+            error:
+              err instanceof Error ? err.message : "tool_invoke_failed",
+          };
+        }
+        const safeForModel = truncateForModel(toolResult);
+        toolsUsed.push({
           name: call.name,
-          response: safeForModel,
-        },
-      });
+          args: call.args,
+          result: { ok: Boolean(toolResult.ok), error: toolResult.error },
+        });
+        responseParts.push({
+          functionResponse: {
+            name: call.name,
+            response: safeForModel,
+          },
+        });
+      }
+      // Gemini expects function responses as a user turn.
+      contents.push({ role: "user", parts: responseParts });
     }
-    // Gemini expects function responses as a user turn.
-    contents.push({ role: "user", parts: responseParts });
-  }
 
-  return {
-    ok: false,
-    reply: "",
-    error: "tool_loop_limit",
-    toolsUsed,
-  };
+    return {
+      ok: false,
+      reply: "",
+      error: "tool_loop_limit",
+      toolsUsed,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      reply: "",
+      error:
+        err instanceof Error ? err.message : "chat_failed",
+      toolsUsed,
+    };
+  }
 }

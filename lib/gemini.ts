@@ -121,22 +121,47 @@ export async function generateContent(args: {
     body.tools = [{ functionDeclarations: args.tools }];
   }
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": args.apiKey,
-    },
-    body: JSON.stringify(body),
-  });
-  const json = (await res.json().catch(() => null)) as GeminiApiResponse | null;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": args.apiKey,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      model,
+      error:
+        err instanceof Error
+          ? `Gemini network error: ${err.message}`
+          : "Gemini network error",
+    };
+  }
+
+  const rawText = await res.text().catch(() => "");
+  let json: GeminiApiResponse | null = null;
+  if (rawText) {
+    try {
+      json = JSON.parse(rawText) as GeminiApiResponse;
+    } catch {
+      json = null;
+    }
+  }
 
   if (!res.ok) {
     return {
       ok: false,
       model,
       status: res.status,
-      error: json?.error?.message || `Gemini HTTP ${res.status}`,
+      error:
+        json?.error?.message ||
+        (rawText
+          ? `Gemini HTTP ${res.status}: ${rawText.slice(0, 200)}`
+          : `Gemini HTTP ${res.status}`),
     };
   }
 

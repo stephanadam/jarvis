@@ -10,6 +10,7 @@ type Health = {
   haReady?: boolean;
   secrets?: Record<string, boolean>;
   capabilities?: Array<{ id: string; status: string }>;
+  error?: string;
 };
 
 type ChatResponse = {
@@ -21,6 +22,26 @@ type ChatResponse = {
   missingSecrets?: string[];
   toolsUsed?: Array<{ name: string }>;
 };
+
+async function readJson<T>(res: Response): Promise<T> {
+  const raw = await res.text();
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new Error(`Empty response (HTTP ${res.status})`);
+  }
+  if (trimmed.startsWith("<") || trimmed.toLowerCase().startsWith("<!doctype")) {
+    throw new Error(
+      `Server returned HTML instead of JSON (HTTP ${res.status}). Sign in to the private app in Cursor, then retry.`,
+    );
+  }
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {
+    throw new Error(
+      `Invalid JSON (HTTP ${res.status}): ${trimmed.slice(0, 120)}`,
+    );
+  }
+}
 
 export default function HomePage() {
   const [apiKey, setApiKey] = useState("");
@@ -41,12 +62,26 @@ export default function HomePage() {
       setHealth({ ok: true });
       return;
     }
+    let cancelled = false;
     fetch("/api/health", {
+      credentials: "include",
       headers: { Authorization: `Bearer ${apiKey.trim()}` },
     })
-      .then((r) => r.json())
-      .then((data: Health) => setHealth(data))
-      .catch(() => setHealth({ ok: false }));
+      .then((r) => readJson<Health>(r))
+      .then((data) => {
+        if (!cancelled) setHealth(data);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setHealth({
+            ok: false,
+            error: err instanceof Error ? err.message : "health failed",
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [apiKey]);
 
   function saveApiKey(value: string) {
@@ -57,7 +92,9 @@ export default function HomePage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!apiKey.trim()) {
-      setError("Paste JARVIS_API_KEY in Settings below (same value you bind in Cursor).");
+      setError(
+        "Paste JARVIS_API_KEY in Settings below (same value you bind in Cursor).",
+      );
       return;
     }
     setBusy(true);
@@ -67,13 +104,18 @@ export default function HomePage() {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey.trim()}`,
         },
         body: JSON.stringify({ message }),
       });
-      const data = (await res.json()) as ChatResponse;
+      const data = await readJson<ChatResponse>(res);
+      if (data.error === "sign_in_required") {
+        setError("Sign in to open this private app, then try again.");
+        return;
+      }
       if (!data.ok) {
         setError(data.error || `HTTP ${res.status}`);
       }
@@ -163,7 +205,7 @@ export default function HomePage() {
               ? "ok · enter API key for details"
               : health.ok
                 ? `ok · gemini ${health.geminiReady ? "ready" : "sample"} · HA ${health.haReady ? "ready" : "unbound"}`
-                : "unreachable"}
+                : health.error || "unreachable"}
         </p>
         {health?.capabilities && (
           <p style={{ margin: "0.4rem 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>
