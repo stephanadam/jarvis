@@ -36,4 +36,5 @@ Run under Node, never Bun.
 
 ## Secrets (names)
 
-`GEMINI_API_KEY` / `GOOGLE_API_KEY`, `NABU_CASA_URL` / `HA_URL`, `HA_TOKEN`
+`JARVIS_API_KEY` (required on `/api/chat`), `GEMINI_API_KEY` / `GOOGLE_API_KEY`,
+`NABU_CASA_URL` / `HA_URL`, `HA_TOKEN`

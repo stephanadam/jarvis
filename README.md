@@ -17,17 +17,20 @@ npm run dev
 # http://127.0.0.1:3000
 ```
 
-Smoke:
+Smoke (requires `JARVIS_API_KEY` in `.env.local`):
 
 ```bash
 curl -s http://127.0.0.1:3000/api/health | jq .
+curl -s http://127.0.0.1:3000/api/health \
+  -H "Authorization: Bearer $JARVIS_API_KEY" | jq .
 curl -s -X POST http://127.0.0.1:3000/api/chat \
   -H 'content-type: application/json' \
+  -H "Authorization: Bearer $JARVIS_API_KEY" \
   -d '{"message":"List your capabilities."}' | jq .
 ```
 
-Without Gemini keys, `/api/chat` returns a **sample-mode** reply that names the
-secrets to bind. With keys + HA secrets bound, Gemini can call HA tools.
+Without Gemini keys, authenticated `/api/chat` returns a **sample-mode** reply.
+With Gemini + HA secrets bound, Gemini can call allowlisted HA tools.
 
 ```bash
 npm run check
@@ -36,40 +39,39 @@ npm run build
 
 ## API
 
-| Method | Path | Body | Response |
+| Method | Path | Auth | Notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/health` | — | `{ ok, secrets:{name:boolean}, geminiReady, haReady, capabilities }` |
-| `POST` | `/api/chat` | `{ "message": "…" }` or `{ "text": "…" }` | `{ ok, reply, text, model, toolsUsed?, error? }` |
+| `GET` | `/api/health` | optional | Without key: `{ ok, service }` only. With key: readiness details. |
+| `POST` | `/api/chat` | **required** | `Authorization: Bearer <JARVIS_API_KEY>` or `x-api-key` |
+
+Body: `{ "message": "…" }` or `{ "text": "…" }` → `{ ok, reply, text, model, … }`.
 
 ## Secrets (names only — never paste values in chat)
 
 | Name | Purpose |
 | --- | --- |
+| **`JARVIS_API_KEY`** | Client API key for chat (and detailed health). Bind in Cursor secure form; use the same value in the web UI Settings field and later in **Safari Settings** for the iPhone app. |
 | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Google AI Studio key for the brain |
 | `NABU_CASA_URL` or `HA_URL` | Remote HA base URL (no trailing slash) |
 | `HA_TOKEN` | Home Assistant long-lived access token |
 
-Bind via Cursor app secrets when publishing (Dashboard / publish dialog). Agents
-never need the raw values in conversation.
+Bind via Cursor app secrets when publishing. Agents never need the raw values in conversation.
 
 ## Layout
 
 | Path | Role |
 | --- | --- |
 | `app/` | Next.js UI + `api/health` + `api/chat` |
-| `lib/` | Gemini client, HA REST, capability registry, chat tool loop |
+| `lib/` | Auth, Gemini, HA REST + allowlist, capability registry, chat loop |
 | `bot/` | Legacy Agent SDK scaffold (not used for deploy) |
 | `evals/` | Legacy Agent SDK evals |
 
 ## Publish (Steve)
 
-1. Merge/push this HTTP app.
-2. In the Cloud Agent chat, confirm **Publish** when proposed (or ask the agent to `publish-app`).
-3. Bind secrets by name in Cursor (Secrets / publish UI): `GEMINI_API_KEY`, `NABU_CASA_URL`, `HA_TOKEN` (and optional aliases).
-4. Smoke `GET /api/health` then `POST /api/chat` on the published URL.
-5. Defer iOS until Phase 1 text path is green.
-
-No Cursor Team / `agent-sdk deploy --team` required.
+1. Confirm **Publish** when the agent proposes an update.
+2. Bind secrets in Cursor (secure form): **`JARVIS_API_KEY`**, `GEMINI_API_KEY`, and when ready `NABU_CASA_URL` / `HA_TOKEN`.
+3. Open the private app, paste `JARVIS_API_KEY` into Settings, smoke chat.
+4. iPhone: store the same `JARVIS_API_KEY` in Safari Settings when that app exists.
 
 ## Models
 
@@ -81,5 +83,5 @@ No Cursor Team / `agent-sdk deploy --team` required.
 ## Notes
 
 - Capability registry includes live `home_assistant.*` and stub `vision.face_recognize`.
-- Health reports whether each secret **name** is present (boolean), never values.
+- HA writes are allowlisted server-side (no locks/alarms/unlocks).
 - Architecture: Project doc `docs/jarvis-architecture.md`.

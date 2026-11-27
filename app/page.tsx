@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
+const API_KEY_STORAGE = "jarvis_api_key";
+
 type Health = {
   ok: boolean;
   geminiReady?: boolean;
@@ -21,6 +23,7 @@ type ChatResponse = {
 };
 
 export default function HomePage() {
+  const [apiKey, setApiKey] = useState("");
   const [health, setHealth] = useState<Health | null>(null);
   const [message, setMessage] = useState("List your capabilities.");
   const [reply, setReply] = useState<string>("");
@@ -29,14 +32,34 @@ export default function HomePage() {
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
-    fetch("/api/health")
+    const saved = window.localStorage.getItem(API_KEY_STORAGE) || "";
+    setApiKey(saved);
+  }, []);
+
+  useEffect(() => {
+    if (!apiKey.trim()) {
+      setHealth({ ok: true });
+      return;
+    }
+    fetch("/api/health", {
+      headers: { Authorization: `Bearer ${apiKey.trim()}` },
+    })
       .then((r) => r.json())
       .then((data: Health) => setHealth(data))
       .catch(() => setHealth({ ok: false }));
-  }, []);
+  }, [apiKey]);
+
+  function saveApiKey(value: string) {
+    setApiKey(value);
+    window.localStorage.setItem(API_KEY_STORAGE, value);
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!apiKey.trim()) {
+      setError("Paste JARVIS_API_KEY in Settings below (same value you bind in Cursor).");
+      return;
+    }
     setBusy(true);
     setError("");
     setReply("");
@@ -44,7 +67,10 @@ export default function HomePage() {
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey.trim()}`,
+        },
         body: JSON.stringify({ message }),
       });
       const data = (await res.json()) as ChatResponse;
@@ -106,13 +132,38 @@ export default function HomePage() {
           borderTop: "1px solid var(--line)",
         }}
       >
-        <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.9rem" }}>
+        <label
+          htmlFor="apiKey"
+          style={{ display: "block", fontSize: "0.85rem", color: "var(--muted)" }}
+        >
+          Settings · JARVIS_API_KEY (stored only in this browser)
+        </label>
+        <input
+          id="apiKey"
+          type="password"
+          autoComplete="off"
+          value={apiKey}
+          onChange={(e) => saveApiKey(e.target.value)}
+          placeholder="Bind in Cursor secrets, paste here / Safari Settings later"
+          style={{
+            width: "100%",
+            marginTop: "0.4rem",
+            padding: "0.7rem 1rem",
+            borderRadius: 10,
+            border: "1px solid var(--line)",
+            background: "rgba(8, 14, 12, 0.65)",
+            color: "var(--ink)",
+          }}
+        />
+        <p style={{ margin: "0.55rem 0 0", color: "var(--muted)", fontSize: "0.9rem" }}>
           Health:{" "}
           {health == null
             ? "checking…"
-            : health.ok
-              ? `ok · gemini ${health.geminiReady ? "ready" : "sample"} · HA ${health.haReady ? "ready" : "unbound"}`
-              : "unreachable"}
+            : !apiKey.trim()
+              ? "ok · enter API key for details"
+              : health.ok
+                ? `ok · gemini ${health.geminiReady ? "ready" : "sample"} · HA ${health.haReady ? "ready" : "unbound"}`
+                : "unreachable"}
         </p>
         {health?.capabilities && (
           <p style={{ margin: "0.4rem 0 0", color: "var(--muted)", fontSize: "0.85rem" }}>
@@ -204,13 +255,16 @@ export default function HomePage() {
         }}
       >
         <p style={{ margin: 0 }}>
-          API: <code>GET /api/health</code> · <code>POST /api/chat</code>{" "}
-          {"{ \"message\": \"…\" }"}
+          API: <code>POST /api/chat</code> needs{" "}
+          <code>Authorization: Bearer &lt;JARVIS_API_KEY&gt;</code>
         </p>
         <p style={{ margin: "0.45rem 0 0" }}>
-          Secrets (names only): <code>GEMINI_API_KEY</code> or{" "}
-          <code>GOOGLE_API_KEY</code>, <code>NABU_CASA_URL</code> or{" "}
-          <code>HA_URL</code>, <code>HA_TOKEN</code>
+          Bind <code>JARVIS_API_KEY</code> in Cursor secrets (secure form). Use
+          the same value here and later in Safari Settings for the iPhone app.
+        </p>
+        <p style={{ margin: "0.45rem 0 0" }}>
+          Also: <code>GEMINI_API_KEY</code> / <code>GOOGLE_API_KEY</code>,{" "}
+          <code>NABU_CASA_URL</code> / <code>HA_URL</code>, <code>HA_TOKEN</code>
         </p>
       </section>
     </main>

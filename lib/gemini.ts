@@ -106,7 +106,8 @@ export async function generateContent(args: {
   tools?: GeminiFunctionDeclaration[];
 }): Promise<GeminiGenerateResult> {
   const model = args.model?.trim() || DEFAULT_GEMINI_MODEL;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(args.apiKey)}`;
+  // Pass the API key in a header — never in the URL query string.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
   const body: Record<string, unknown> = {
     contents: args.contents,
@@ -122,7 +123,10 @@ export async function generateContent(args: {
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": args.apiKey,
+    },
     body: JSON.stringify(body),
   });
   const json = (await res.json().catch(() => null)) as GeminiApiResponse | null;
