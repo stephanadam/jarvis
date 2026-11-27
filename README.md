@@ -1,8 +1,8 @@
 # Jarvis
 
 Steve's home-assistant **HTTP cloud brain**: Gemini + Home Assistant (Nabu Casa),
-deployable with Cursor **publish-app**. Designed for a future iPhone voice client
-(`POST /api/chat` text in/out).
+deployable with Cursor **publish-app**, plus a custom **iOS voice client** under
+`ios/Jarvis/` (not the Grok iPhone app).
 
 Agent SDK files under `bot/` remain in-repo as an unused scaffold. Deploy does
 **not** use `agent-sdk deploy` or `CURSOR_API_KEY`.
@@ -38,8 +38,11 @@ npm run build
 
 | Method | Path | Body | Response |
 | --- | --- | --- | --- |
-| `GET` | `/api/health` | — | `{ ok, secrets:{name:boolean}, geminiReady, haReady, capabilities }` |
+| `GET` | `/api/health` | — | `{ ok, secrets:{name:boolean}, geminiReady, haReady, apiKeyRequired, capabilities }` |
 | `POST` | `/api/chat` | `{ "message": "…" }` or `{ "text": "…" }` | `{ ok, reply, text, model, toolsUsed?, error? }` |
+
+When `JARVIS_API_KEY` is set, `/api/*` requires header `X-Jarvis-Key` (or
+`Authorization: Bearer`).
 
 ## Secrets (names only — never paste values in chat)
 
@@ -48,26 +51,43 @@ npm run build
 | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Google AI Studio key for the brain |
 | `NABU_CASA_URL` or `HA_URL` | Remote HA base URL (no trailing slash) |
 | `HA_TOKEN` | Home Assistant long-lived access token |
+| `JARVIS_API_KEY` | Optional device key for iPhone / non-browser clients |
 
 Bind via Cursor app secrets when publishing (Dashboard / publish dialog). Agents
 never need the raw values in conversation.
+
+## iOS voice app
+
+```bash
+open ios/Jarvis/Jarvis.xcodeproj   # Mac + Xcode 15+
+```
+
+Hold-to-talk → Apple Speech → `POST /api/chat` → AVSpeech TTS. Details and
+**TestFlight checklist**: [`ios/Jarvis/README.md`](ios/Jarvis/README.md),
+[`ios/Jarvis/TESTFLIGHT.md`](ios/Jarvis/TESTFLIGHT.md).
+
+**Auth note:** a **private** Cursor publish-app returns `sign_in_required` to the
+phone. Practical path: publish **public** + `JARVIS_API_KEY`, then enter that key
+in the app Settings sheet.
 
 ## Layout
 
 | Path | Role |
 | --- | --- |
 | `app/` | Next.js UI + `api/health` + `api/chat` |
-| `lib/` | Gemini client, HA REST, capability registry, chat tool loop |
+| `lib/` | Gemini client, HA REST, capability registry, chat tool loop, API key helper |
+| `middleware.ts` | Optional `JARVIS_API_KEY` gate for `/api/*` |
+| `ios/Jarvis/` | SwiftUI voice MVP (TestFlight via Steve’s Apple account) |
 | `bot/` | Legacy Agent SDK scaffold (not used for deploy) |
 | `evals/` | Legacy Agent SDK evals |
 
 ## Publish (Steve)
 
-1. Merge/push this HTTP app.
+1. Merge/push this HTTP app (+ iOS folder).
 2. In the Cloud Agent chat, confirm **Publish** when proposed (or ask the agent to `publish-app`).
-3. Bind secrets by name in Cursor (Secrets / publish UI): `GEMINI_API_KEY`, `NABU_CASA_URL`, `HA_TOKEN` (and optional aliases).
-4. Smoke `GET /api/health` then `POST /api/chat` on the published URL.
-5. Defer iOS until Phase 1 text path is green.
+3. For phone access: visibility **public** + bind `JARVIS_API_KEY` (and `GEMINI_API_KEY`; HA later).
+4. Smoke `GET /api/health` then `POST /api/chat` (with `X-Jarvis-Key` if set).
+5. On a Mac: open `ios/Jarvis`, sign with your Apple Team, archive → TestFlight.
 
 No Cursor Team / `agent-sdk deploy --team` required.
 
