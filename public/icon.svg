@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Jarvis">
+  <defs>
+    <radialGradient id="g" cx="38%" cy="32%" r="65%">
+      <stop offset="0%" stop-color="#7dffc8"/>
+      <stop offset="45%" stop-color="#2a9a6e"/>
+      <stop offset="100%" stop-color="#0d2a1f"/>
+    </radialGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#070b0a"/>
+  <circle cx="64" cy="64" r="42" fill="url(#g)" stroke="#7dffc8" stroke-opacity="0.35" stroke-width="2"/>
+  <circle cx="64" cy="64" r="14" fill="#e7f2ec" fill-opacity="0.9"/>
+</svg>

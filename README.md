@@ -56,25 +56,34 @@ When `JARVIS_API_KEY` is set, `/api/*` requires header `X-Jarvis-Key` (or
 Bind via Cursor app secrets when publishing (Dashboard / publish dialog). Agents
 never need the raw values in conversation.
 
-## iOS voice app
+## Safari / mobile voice (no Mac / TestFlight)
+
+Open `/` or `/voice` in **Safari** on iPhone:
+
+- Hold the orb → Web Speech API STT → `POST /api/chat` → `speechSynthesis` TTS
+- Text chat always available as fallback
+- **Settings** (localStorage): API base URL + `JARVIS_API_KEY` (sent as `X-Jarvis-Key`)
+- **Home Screen** tip sheet: Safari Share → Add to Home Screen
+
+**Auth note:** a **private** Cursor publish-app returns `sign_in_required` before
+Next.js. For the phone: publish **public** + bind `JARVIS_API_KEY`, then enter the
+same key in the page Settings.
+
+## iOS native app (optional later)
 
 ```bash
-open ios/Jarvis/Jarvis.xcodeproj   # Mac + Xcode 15+
+open ios/Jarvis/Jarvis.xcodeproj   # Mac + Xcode 15+ + Apple Developer
 ```
 
 Hold-to-talk → Apple Speech → `POST /api/chat` → AVSpeech TTS. Details and
 **TestFlight checklist**: [`ios/Jarvis/README.md`](ios/Jarvis/README.md),
 [`ios/Jarvis/TESTFLIGHT.md`](ios/Jarvis/TESTFLIGHT.md).
 
-**Auth note:** a **private** Cursor publish-app returns `sign_in_required` to the
-phone. Practical path: publish **public** + `JARVIS_API_KEY`, then enter that key
-in the app Settings sheet.
-
 ## Layout
 
 | Path | Role |
 | --- | --- |
-| `app/` | Next.js UI + `api/health` + `api/chat` |
+| `app/` | Next.js UI (Safari hold-to-talk + text) + `api/health` + `api/chat` |
 | `lib/` | Gemini client, HA REST, capability registry, chat tool loop, API key helper |
 | `middleware.ts` | Optional `JARVIS_API_KEY` gate for `/api/*` |
 | `ios/Jarvis/` | SwiftUI voice MVP (TestFlight via Steve’s Apple account) |
@@ -83,11 +92,12 @@ in the app Settings sheet.
 
 ## Publish (Steve)
 
-1. Merge/push this HTTP app (+ iOS folder).
+1. Merge/push this HTTP app (+ voice UI + optional iOS folder).
 2. In the Cloud Agent chat, confirm **Publish** when proposed (or ask the agent to `publish-app`).
 3. For phone access: visibility **public** + bind `JARVIS_API_KEY` (and `GEMINI_API_KEY`; HA later).
 4. Smoke `GET /api/health` then `POST /api/chat` (with `X-Jarvis-Key` if set).
-5. On a Mac: open `ios/Jarvis`, sign with your Apple Team, archive → TestFlight.
+5. On iPhone Safari: open the public URL → Settings → paste API key → Add to Home Screen.
+6. Optional later: Mac + Apple Developer → `ios/Jarvis` → TestFlight.
 
 No Cursor Team / `agent-sdk deploy --team` required.
 
